@@ -29,9 +29,9 @@ def parse_args():
                         help="Load the LLM in 4-bit quantized mode to save VRAM and speed up")
     parser.add_argument("--top_k", type=int, default=1, 
                         help="Number of chunks to retrieve per question")
-    parser.add_argument("--batch_size", type=int, default=4, 
+    parser.add_argument("--batch_size", type=int, default=1, 
                         help="Number of questions to group in a single prompt")
-    parser.add_argument("--inference_batch_size", type=int, default=8, 
+    parser.add_argument("--inference_batch_size", type=int, default=4, 
                         help="Number of prompts to batch together for GPU inference")
     parser.add_argument("--limit", type=int, default=None, 
                         help="Limit questions to process for debugging")
