@@ -155,8 +155,13 @@ def shuffle_choices(choices):
         
     return shuffled_texts, letter_mapping
 
-def build_batch_prompt(batch_items, use_shuffled_choices=False):
+def build_batch_prompt(batch_items, use_shuffled_choices=False, enable_cot=False):
     prompt = "Hãy trả lời các câu hỏi trắc nghiệm dưới đây. Đọc kỹ phần Ngữ cảnh đi kèm của từng câu hỏi.\n\n"
+    if enable_cot:
+        prompt += (
+            "--- HƯỚNG DẪN TƯ DUY ---\n"
+            "Đối với từng câu hỏi dưới đây, trước khi đưa ra chữ cái đáp án cuối cùng, bạn hãy viết ngắn gọn 1-2 dòng giải thích lập luận (Chain of Thought).\n\n"
+        )
     
     prompt += (
         "--- VÍ DỤ MINH HỌA ---\n"
@@ -205,8 +210,12 @@ def build_batch_prompt(batch_items, use_shuffled_choices=False):
     prompt += (
         "--- HƯỚNG DẪN TRẢ LỜI ---\n"
         "Hãy trả lời tất cả các câu hỏi trên.\n"
-        "BẮT BUỘC chỉ xuất ra kết quả đáp án cuối cùng theo định dạng dòng chính xác sau (KHÔNG giải thích thêm, KHÔNG phân tích, KHÔNG thêm bất kỳ văn bản nào khác):\n"
     )
+    if enable_cot:
+        prompt += "Hãy ghi phần phân tích suy luận ngắn gọn trước, sau đó BẮT BUỘC chốt đáp án cuối cùng theo định dạng dòng chính xác sau (không giải thích thêm ở dòng này):\n"
+    else:
+        prompt += "BẮT BUỘC chỉ xuất ra kết quả đáp án cuối cùng theo định dạng dòng chính xác sau (KHÔNG giải thích thêm, KHÔNG phân tích, KHÔNG thêm bất kỳ văn bản nào khác):\n"
+        
     for item in batch_items:
         prompt += f"{item['qid']}: <chữ cái đáp án chọn>\n"
         
@@ -299,7 +308,8 @@ def main():
             "choices": choices,
             "shuffled_choices": shuffled_choices,
             "letter_mapping": letter_mapping,
-            "selected_chunks": selected_chunks
+            "selected_chunks": selected_chunks,
+            "chunks": chunks
         })
         
         inference_times[qid] = end_embed - start_embed
@@ -589,6 +599,14 @@ def main():
         for step in tqdm(range(num_inference_steps_p2), desc="Processing PASS 2"):
             step_batches = p2_batches[step * inference_batch_size : (step + 1) * inference_batch_size]
             
+            # Dynamically scale context to top_k=3 for difficult conflicted questions
+            if not args.mock and embed_model is not None:
+                for batch_items in step_batches:
+                    for item in batch_items:
+                        item["selected_chunks"] = retrieve_top_chunks(
+                            embed_model, item["chunks"], item["query"], top_k=3
+                        )
+            
             qids_in_step_p2 = []
             for batch_items in step_batches:
                 for item in batch_items:
@@ -601,7 +619,7 @@ def main():
                 templated_prompts_1 = []
                 first_qids = []
                 for batch_items in step_batches:
-                    prompt_1 = build_batch_prompt(batch_items, use_shuffled_choices=False)
+                    prompt_1 = build_batch_prompt(batch_items, use_shuffled_choices=False, enable_cot=True)
                     messages_1 = [
                         {"role": "system", "content": system_instructions},
                         {"role": "user", "content": prompt_1}
@@ -624,7 +642,7 @@ def main():
                 # --- RUN 2 (Shuffled Choices) ---
                 templated_prompts_2 = []
                 for batch_items in step_batches:
-                    prompt_2 = build_batch_prompt(batch_items, use_shuffled_choices=True)
+                    prompt_2 = build_batch_prompt(batch_items, use_shuffled_choices=True, enable_cot=True)
                     messages_2 = [
                         {"role": "system", "content": system_instructions},
                         {"role": "user", "content": prompt_2}
