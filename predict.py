@@ -31,8 +31,8 @@ def parse_args():
                         help="Number of chunks to retrieve per question")
     parser.add_argument("--batch_size", type=int, default=1, 
                         help="Number of questions to group in a single prompt")
-    parser.add_argument("--inference_batch_size", type=int, default=4, 
-                        help="Number of prompts to batch together for GPU inference")
+    parser.add_argument("--inference_batch_size", type=int, default=-1, 
+                        help="Number of prompts to batch together for GPU inference (default: -1 for auto-tune)")
     parser.add_argument("--limit", type=int, default=None, 
                         help="Limit questions to process for debugging")
     parser.add_argument("--mock", action="store_true", 
@@ -348,11 +348,11 @@ def main():
         model = AutoModelForCausalLM.from_pretrained(model_id, **model_kwargs)
         
         # Dynamic VRAM-based batch size tuning
-        if device == "cuda":
-            try:
-                total_memory = torch.cuda.get_device_properties(0).total_memory
-                vram_gb = total_memory / (1024 ** 3)
-                if args.inference_batch_size == 8:
+        if args.inference_batch_size == -1:
+            if device == "cuda":
+                try:
+                    total_memory = torch.cuda.get_device_properties(0).total_memory
+                    vram_gb = total_memory / (1024 ** 3)
                     if vram_gb < 15:
                         inference_batch_size = 4
                     elif vram_gb < 23:
@@ -362,8 +362,13 @@ def main():
                     else:
                         inference_batch_size = 32
                     print(f"[*] Auto-adjusted inference_batch_size to {inference_batch_size} based on {vram_gb:.2f} GB VRAM.")
-            except Exception as e:
-                print(f"[!] GPU VRAM detection failed: {e}. Using default batch size.")
+                except Exception as e:
+                    print(f"[!] GPU VRAM detection failed: {e}. Using fallback batch size 4.")
+                    inference_batch_size = 4
+            else:
+                inference_batch_size = 4
+        else:
+            inference_batch_size = args.inference_batch_size
                 
         gen_pipeline = pipeline(
             "text-generation",
