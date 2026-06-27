@@ -245,6 +245,15 @@ def mock_choose_answer(qid, choices):
 def main():
     args = parse_args()
     
+    # Resolve relative output paths to /code in container if it exists
+    if os.path.exists("/code") and os.path.isdir("/code"):
+        if not os.path.isabs(args.output_path):
+            args.output_path = os.path.join("/code", args.output_path)
+        if not os.path.isabs(args.time_output_path):
+            args.time_output_path = os.path.join("/code", args.time_output_path)
+        if not os.path.isabs(args.log_path):
+            args.log_path = os.path.join("/code", args.log_path)
+            
     # Clean output files
     for p in [args.output_path, args.time_output_path, args.log_path]:
         if os.path.exists(p):
