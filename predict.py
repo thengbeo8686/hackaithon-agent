@@ -18,7 +18,7 @@ def parse_args():
                         help="Path to save execution time logs")
     parser.add_argument("--log_path", type=str, default="double_predictions.csv", 
                         help="Path to save double run comparison log")
-    parser.add_argument("--model_id", type=str, default="/models/Qwen2.5-3B-Instruct", 
+    parser.add_argument("--model_id", type=str, default="/models/Qwen3.5-4B", 
                         help="HuggingFace model ID or local weights path")
     parser.add_argument("--embed_id", type=str, 
                         default="/app/models/bge-m3" if os.path.exists("/app/models/bge-m3") else "BAAI/bge-m3", 
