@@ -1,0 +1,6 @@
+pandas
+transformers
+accelerate
+bitsandbytes
+tqdm
+sentence-transformers
